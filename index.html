@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Career DNA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+            color: #E0E0E0;
+        }
+
+        .gradient-text {
+            background-image: linear-gradient(to right, #6EE7B7, #3B82F6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center justify-center min-h-screen px-4">
+
+    <!-- Main Container -->
+    <div class="flex flex-col items-center max-w-4xl w-full text-center">
+
+        <!-- Title, Subtitle, and Score -->
+        <h1 class="text-5xl font-extrabold mb-2 gradient-text">Career DNA</h1>
+        <p class="text-lg text-gray-400 mb-8">
+            Turn any topic into a roadmap of jobs, skills, and projects.
+        </p>
+
+        <!-- Score Display and Progress Bar -->
+        <div class="mb-6 p-4 bg-[#1F2937] rounded-xl shadow-xl border border-gray-700 w-full max-w-xs sm:max-w-md">
+            <p class="text-lg font-bold text-center mb-2">Your Score: <span id="scoreDisplay" class="text-green-400">0</span></p>
+            <div class="w-full bg-gray-600 rounded-full h-2.5">
+                <div id="progressBar" class="bg-gradient-to-r from-green-400 to-blue-500 h-2.5 rounded-full transition-all duration-300 ease-in-out" style="width: 0%;"></div>
+            </div>
+        </div>
+
+        <!-- Input Section -->
+        <div class="flex flex-col sm:flex-row sm:space-x-4 items-center w-full max-w-xl">
+            <!-- Inputs container -->
+            <div class="flex flex-col space-y-4 w-full sm:w-auto sm:flex-grow">
+                <input type="text" id="userInput"
+                    class="p-4 bg-[#1F2937] text-white rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+                    placeholder="e.g., 'Thermodynamics' or 'Biomedical Engineering'" />
+                <input type="text" id="goalInput"
+                    class="p-4 bg-[#1F2937] text-white rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+                    placeholder="Optional: Your personal career goal (e.g., 'Lead a team at Google')" />
+            </div>
+            <button id="generateButton"
+                class="mt-4 sm:mt-0 p-4 bg-blue-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 transition-all duration-300 w-full sm:w-auto">
+                Generate Roadmap
+            </button>
+        </div>
+
+        <!-- Roadmap/Quiz Content Placeholder -->
+        <div id="contentContainer" class="mt-8 w-full">
+            <div id="roadmapContent" class="w-full">
+                <!-- Roadmap content will be generated here -->
+            </div>
+            <div id="quizContent" class="hidden w-full">
+                <!-- Quiz content will be generated here -->
+            </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="mt-4 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 w-full max-w-xl">
+            <button id="takeQuizButton"
+                class="hidden p-4 bg-green-600 text-white font-semibold rounded-md shadow-md hover:bg-green-700 transition-all duration-300 w-full sm:w-auto">
+                Take Quiz
+            </button>
+            <button id="submitQuizButton"
+                class="hidden p-4 bg-blue-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 transition-all duration-300 w-full sm:w-auto">
+                Submit Quiz
+            </button>
+        </div>
+
+        <!-- Loading Spinner and Error Message -->
+        <div id="loading" class="hidden mt-4 text-blue-400 flex items-center justify-center">
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none"
+                viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.968l3-2.677z">
+                </path>
+            </svg>
+            Generating...
+        </div>
+        <div id="errorMessage" class="hidden mt-4 p-4 text-red-400 bg-red-900 bg-opacity-30 rounded-lg">
+            An error occurred. Please try again.
+        </div>
+    </div>
+
+    <!-- JavaScript to handle the API call -->
+    <script type="module">
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        const generateButton = document.getElementById('generateButton');
+        const takeQuizButton = document.getElementById('takeQuizButton');
+        const submitQuizButton = document.getElementById('submitQuizButton');
+        const userInput = document.getElementById('userInput');
+        const goalInput = document.getElementById('goalInput');
+        const roadmapContent = document.getElementById('roadmapContent');
+        const quizContent = document.getElementById('quizContent');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const progressBar = document.getElementById('progressBar');
+
+        let currentScore = 0;
+        let totalRoadmapItems = 0;
+        let quizData = null;
+
+        // Helper function for exponential backoff
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Function to update the score and progress bar
+        function updateScore(points, total) {
+            currentScore += points;
+            scoreDisplay.textContent = currentScore;
+            
+            if (total > 0) {
+                const checkedItems = document.querySelectorAll('#roadmapContent input[type="checkbox"]:checked').length +
+                                     document.querySelectorAll('#quizContent input[type="radio"]:checked').length;
+                const progressPercentage = (checkedItems / total) * 100;
+                progressBar.style.width = `${progressPercentage}%`;
+            }
+        }
+
+        // Event listener for roadmap checkboxes
+        roadmapContent.addEventListener('change', (event) => {
+            if (event.target.type === 'checkbox') {
+                if (event.target.checked) {
+                    updateScore(10, totalRoadmapItems + (quizData ? quizData.questions.length : 0));
+                } else {
+                    updateScore(-10, totalRoadmapItems + (quizData ? quizData.questions.length : 0));
+                }
+            }
+        });
+
+        // Event listener for quiz submission
+        submitQuizButton.addEventListener('click', () => {
+            let correctAnswers = 0;
+            const totalQuestions = quizData.questions.length;
+            
+            quizData.questions.forEach((question, index) => {
+                const selectedOption = document.querySelector(`input[name="question-${index}"]:checked`);
+                if (selectedOption) {
+                    const selectedValue = parseInt(selectedOption.value);
+                    if (question.options[selectedValue].isCorrect) {
+                        correctAnswers++;
+                        updateScore(15, totalRoadmapItems + totalQuestions);
+                    }
+                }
+            });
+
+            submitQuizButton.classList.add('hidden');
+            takeQuizButton.classList.remove('hidden');
+
+            // Show rationale for all questions
+            document.querySelectorAll('.rationale').forEach(el => el.classList.remove('hidden'));
+        });
+
+        generateButton.addEventListener('click', async () => {
+            const userText = userInput.value.trim();
+            const goalText = goalInput.value.trim();
+            if (!userText) return;
+
+            roadmapContent.innerHTML = '';
+            quizContent.innerHTML = '';
+            roadmapContent.classList.remove('hidden');
+            quizContent.classList.add('hidden');
+            takeQuizButton.classList.add('hidden');
+            submitQuizButton.classList.add('hidden');
+            loading.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            
+            // Reset score and progress bar when a new roadmap is generated
+            currentScore = 0;
+            totalRoadmapItems = 0;
+            scoreDisplay.textContent = currentScore;
+            progressBar.style.width = '0%';
+
+            let promptText = `Create a career roadmap for the field of ${userText}. The roadmap should have three main sections: "Junior Developer", "Mid-level Developer", and "Senior Developer". Each section should be a list of skills, projects, and responsibilities. The response should be in markdown format.`;
+
+            if (goalText) {
+                promptText = `Create a career roadmap for the field of ${userText} with a personal career goal of "${goalText}". The roadmap should have three main sections: "Junior Developer", "Mid-level Developer", and "Senior Developer". Each section should be a list of skills, projects, and responsibilities. The response should be in markdown format.`;
+            }
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: promptText }]
+                }],
+            };
+
+            const maxRetries = 5;
+            let currentRetry = 0;
+            let success = false;
+            let result;
+
+            while (currentRetry < maxRetries && !success) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        result = await response.json();
+                        success = true;
+                    } else if (response.status === 429) { // Rate limit exceeded
+                        const delay = Math.pow(2, currentRetry) * 1000;
+                        console.log(`Rate limit exceeded. Retrying in ${delay}ms...`);
+                        await sleep(delay);
+                        currentRetry++;
+                    } else {
+                        throw new Error(`API returned status ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Fetch error:', error);
+                    break;
+                }
+            }
+
+            loading.classList.add('hidden');
+
+            if (success) {
+                const aiText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (aiText) {
+                    roadmapContent.innerHTML = convertMarkdownToHtml(aiText);
+                    totalRoadmapItems = roadmapContent.querySelectorAll('input[type="checkbox"]').length;
+                    takeQuizButton.classList.remove('hidden');
+                } else {
+                    errorMessage.classList.remove('hidden');
+                    console.error('API response was missing content.');
+                }
+            } else {
+                errorMessage.classList.remove('hidden');
+            }
+        });
+
+        takeQuizButton.addEventListener('click', async () => {
+            const userText = userInput.value.trim();
+            if (!userText) return;
+
+            roadmapContent.classList.add('hidden');
+            quizContent.classList.remove('hidden');
+            takeQuizButton.classList.add('hidden');
+            submitQuizButton.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            quizContent.innerHTML = '';
+            
+            // Reset quiz-related scores
+            currentScore = 0;
+            scoreDisplay.textContent = currentScore;
+            progressBar.style.width = '0%';
+            quizData = null;
+
+            const quizPrompt = `Generate a 5-question multiple-choice quiz about career development, skills, and projects related to "${userText}". The response should be a JSON object with a 'questions' array. Each question object must have 'question', 'options' (an array of objects with 'text', 'isCorrect', and 'rationale'), and 'correctAnswerIndex'.`;
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: quizPrompt }]
+                }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "questions": {
+                                "type": "ARRAY",
+                                "items": {
+                                    "type": "OBJECT",
+                                    "properties": {
+                                        "question": { "type": "STRING" },
+                                        "options": {
+                                            "type": "ARRAY",
+                                            "items": {
+                                                "type": "OBJECT",
+                                                "properties": {
+                                                    "text": { "type": "STRING" },
+                                                    "isCorrect": { "type": "BOOLEAN" },
+                                                    "rationale": { "type": "STRING" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            const maxRetries = 5;
+            let currentRetry = 0;
+            let success = false;
+            let result;
+
+            while (currentRetry < maxRetries && !success) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        const rawText = await response.text();
+                        result = JSON.parse(rawText);
+                        success = true;
+                    } else if (response.status === 429) {
+                        const delay = Math.pow(2, currentRetry) * 1000;
+                        console.log(`Rate limit exceeded. Retrying in ${delay}ms...`);
+                        await sleep(delay);
+                        currentRetry++;
+                    } else {
+                        throw new Error(`API returned status ${response.status}`);
+                    }
+                } catch (error) {
+                    console.error('Fetch error:', error);
+                    break;
+                }
+            }
+
+            loading.classList.add('hidden');
+
+            if (success && result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                const rawJson = result.candidates[0].content.parts[0].text;
+                try {
+                    quizData = JSON.parse(rawJson);
+                    renderQuiz(quizData.questions);
+                } catch (e) {
+                    console.error('Failed to parse quiz JSON:', e);
+                    errorMessage.classList.remove('hidden');
+                }
+            } else {
+                errorMessage.classList.remove('hidden');
+            }
+        });
+
+        function renderQuiz(questions) {
+            quizContent.innerHTML = '';
+            const quizContainer = document.createElement('div');
+            quizContainer.className = 'p-8 bg-[#1F2937] rounded-xl shadow-xl text-left border border-gray-700 w-full';
+
+            questions.forEach((q, qIndex) => {
+                const questionEl = document.createElement('div');
+                questionEl.className = 'mb-6';
+                questionEl.innerHTML = `
+                    <p class="text-xl font-semibold mb-3">${qIndex + 1}. ${q.question}</p>
+                    <div class="space-y-2">
+                        ${q.options.map((option, oIndex) => `
+                            <label class="flex items-center space-x-2 cursor-pointer p-3 bg-gray-800 rounded-lg transition-colors duration-200 hover:bg-gray-700">
+                                <input type="radio" name="question-${qIndex}" value="${oIndex}" class="h-4 w-4 text-blue-600 focus:ring-blue-500">
+                                <span class="text-white">${option.text}</span>
+                            </label>
+                        `).join('')}
+                        <p class="rationale hidden mt-2 text-sm text-gray-400"><strong>Rationale:</strong> ${q.options.find(o => o.isCorrect).rationale}</p>
+                    </div>
+                `;
+                quizContainer.appendChild(questionEl);
+            });
+
+            quizContent.appendChild(quizContainer);
+        }
+
+        // Robust markdown conversion function for this example
+        function convertMarkdownToHtml(markdown) {
+            let html = markdown;
+
+            // Convert headings
+            html = html.replace(/^### (.*)$/gm, '<h3 class="text-2xl font-bold mt-8 mb-4 text-blue-300">$1</h3>');
+            html = html.replace(/^## (.*)$/gm, '<h2 class="text-3xl font-extrabold mt-12 mb-6 text-green-400">$1</h2>');
+            html = html.replace(/^# (.*)$/gm, '<h1 class="text-4xl font-extrabold mt-16 mb-8 gradient-text">$1</h1>');
+
+            // Convert bullet points to list items with checkboxes
+            html = html.replace(/^\* (.*)$/gm, '<li class="ml-6 mb-2 flex items-center"><input type="checkbox" class="mr-2 h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"><span>$1</span></li>');
+
+            // Convert bold text
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            // Wrap lists in ul tags
+            html = html.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+            html = html.replace(/<\/ul>\s*<ul>/g, ''); // Fix multiple ul tags
+
+            // Wrap the entire output in a styled container
+            html = `<div class="p-8 bg-[#1F2937] rounded-xl shadow-xl text-left border border-gray-700 w-full">${html}</div>`;
+
+            return html;
+        }
+
+    </script>
+</body>
+
+</html>
